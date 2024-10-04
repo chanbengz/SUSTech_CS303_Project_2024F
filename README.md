@@ -1,7 +1,7 @@
 <div align='center'>
 
 # SUSTech_CS303_Project_2024F
-3 projects to teach you AI
+3 Projects to Teach You AI
 </div>
 
 ## Projects

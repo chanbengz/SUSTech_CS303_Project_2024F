@@ -37,13 +37,10 @@ def read_dataset(network_path, initial_seed_path, balanced_seed_path) -> (networ
 def evaluate(graph, set1, set2, simtimes) -> float:
     expected = 0
     node_num = graph.number_of_nodes()
-    rand_list1 = np.random.rand(simtimes, graph.number_of_edges())
-    rand_list2 = np.random.rand(simtimes, graph.number_of_edges())
     edges = {node: graph.edges(node, data=True) for node in graph.nodes}
 
-    for i in range(simtimes):
+    for _ in range(simtimes):
         # find compaign 1's infected
-        j = 0
         infected1 = set1.copy()
         activated = set1.copy()
         active = set1.copy()
@@ -53,14 +50,12 @@ def evaluate(graph, set1, set2, simtimes) -> float:
                 for v, n, p in edges[node]:
                     if n not in activated:
                         infected1.add(n)
-                        if rand_list1[i][j] < p['p1']:
+                        if np.random.rand() < p['p1']:
                             new.add(n)
-                        j += 1
             activated.update(new)
             active = new
 
         # find compaign 2's infected
-        j = 0
         infected2 = set2.copy()
         activated = set2.copy()
         active = set2.copy()
@@ -70,12 +65,12 @@ def evaluate(graph, set1, set2, simtimes) -> float:
                 for v, n, p in edges[node]:
                     if n not in activated:
                         infected2.add(n)
-                        if rand_list2[i][j] < p['p2']:
+                        if np.random.rand() < p['p2']:
                             new.add(n)
-                        j += 1
             activated.update(new)
             active = new
 
+        # result of the simulation
         expected += node_num - len(set.symmetric_difference(infected1, infected2))
 
     return expected / simtimes
@@ -84,9 +79,10 @@ def evaluate(graph, set1, set2, simtimes) -> float:
 if __name__ == "__main__":
     start = time.time()
     graph, set1, set2 = read_dataset(args.network, args.initial_seed, args.balanced_seed)
-    ans = evaluate(graph, set1, set2, 500)
-    # print(f"Execution time: {time.time() - start:.2f}s")
-    # print(ans)
+    ans = evaluate(graph, set1, set2, 1000)
 
     with open(args.output, "w") as f:
         f.write(str(ans))
+
+    # print(f"Execution time: {time.time() - start:.2f}s")
+    # print(ans)
