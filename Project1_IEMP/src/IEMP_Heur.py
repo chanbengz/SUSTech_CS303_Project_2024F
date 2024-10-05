@@ -55,7 +55,7 @@ def heur_search(graph1, graph2, neighbor, i1, i2, n, k, simtimes) -> (set, set):
     r1 = reduce(lambda acc, i: acc | blncd1[i], i1, r1)
     r2 = reduce(lambda acc, i: acc | blncd2[i], i2, r2)
     init = n - len(r1 ^ r2)
-    exp_max1 = exp_max2 = init
+    max1 = max2 = init
 
     s1, s2 = set(), set()
     while len(s1) + len(s2) < k:
@@ -64,22 +64,22 @@ def heur_search(graph1, graph2, neighbor, i1, i2, n, k, simtimes) -> (set, set):
         v1_id = v2_id = -1
         for i in graph1.keys():
             if i not in u1:
-                sim_res = n - len((r1 | blncd1[i]) ^ r2)
-                if sim_res > exp_max1:
-                    exp_max1 = sim_res
+                res = n - len((r1 | blncd1[i]) ^ r2)
+                if res > max1:
+                    max1 = res
                     v1_id = i
 
         for i in graph2.keys():
             if i not in u2:
-                sim_res = n - len(r1 ^ (r2 | blncd2[i]))
-                if sim_res > exp_max2:
-                    exp_max2 = sim_res
+                sim = n - len(r1 ^ (r2 | blncd2[i]))
+                if sim > max2:
+                    max2 = sim
                     v2_id = i
 
         if v1_id == -1 and v2_id == -1:
             break
         elif v1_id != -1 and v2_id != -1:
-            if exp_max1 < exp_max2:
+            if max1 < max2:
                 s2.add(v2_id)
                 r2 = r2 | blncd2[v2_id]
             else:
@@ -93,9 +93,9 @@ def heur_search(graph1, graph2, neighbor, i1, i2, n, k, simtimes) -> (set, set):
                 s1.add(v1_id)
                 r1 = r1 | blncd1[v1_id]
 
-        exp_max1 = exp_max2 = max(exp_max1, exp_max2)
+        max1 = max2 = max(max1, max2)
 
-    # print(max(exp_max1, exp_max2))
+    # print(max(max1, max2))
     return s1, s2
 
 
@@ -125,7 +125,7 @@ def read_dataset(network_path, initial_seed_path) -> (dict, dict, dict, set, set
 if __name__ == "__main__":
     start = time.time()
     graph1, graph2, neighbor, i1, i2 = read_dataset(args.network, args.initial_seed)
-    bset1, bset2 = heur_search(graph1, graph2, neighbor, i1, i2, len(neighbor.keys()), args.budget, 5)
+    bset1, bset2 = heur_search(graph1, graph2, neighbor, i1, i2, len(neighbor.keys()), args.budget, 4)
 
     with open(args.balanced_seed, "w") as f:
         f.write(f"{len(bset1)} {len(bset2)}\n")
