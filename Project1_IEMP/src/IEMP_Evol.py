@@ -13,9 +13,9 @@ parser.add_argument("--balanced-seed", "-b", type=str, required=True)
 parser.add_argument("--budget", "-k", type=int, required=True)
 args = parser.parse_args()
 
-k = 0
+S = 0
 N = 100
-global bln1, bln2, res1, res2, n, nodes, sl1, sl2, s_bln1, s_bln2, Ns, prob, dicnum, probw
+global bln1, bln2, res1, res2, nodes, sl1, sl2, s_bln1, s_bln2, Ns, prob, dicnum, probw
 
 
 def read_dataset(network_path, initial_seed_path):
@@ -84,7 +84,7 @@ def generate_structure(nums):
     pop = []
     for _ in range(nums):
         tmp = []
-        k_num = np.random.randint(k - 3, k + 1)
+        k_num = np.random.randint(args.budget - 3, args.budget + 1)
         indices = np.random.choice(dicnum, size=k_num, p=probw, replace=False).tolist()
         for index in indices:
             i = index // 2
@@ -96,7 +96,7 @@ def generate_structure(nums):
     return pop
 
 
-def fitness_calc(sample):
+def fitness(sample):
     r1, r2 = copy.deepcopy(res1), copy.deepcopy(res2)
     s1 = [_ for _ in sample if _ < nodes]
     s2 = [_ - nodes for _ in sample if _ >= nodes]
@@ -104,37 +104,27 @@ def fitness_calc(sample):
     r2 = reduce(lambda acc, i: acc | bln2[i], s2, r2)
 
     blnmax = nodes - len(r1 ^ r2)
-    if len(sample) > k:
+    if len(sample) > args.budget:
         return -blnmax, sample
     return blnmax, sample
 
 
-def cross_over(pa1, pa2):
-    child1, child2 = [], []
-    c_point = np.random.randint(nodes * 2)
-    for i in pa1:
-        (child1 if i < c_point else child2).append(i)
-    for i in pa2:
-        (child2 if i < c_point else child1).append(i)
-    return sorted(child1), sorted(child2)
-
-
 def mutation(sample):
     mut_type = np.random.randint(2)
-    length = len(sample)
-    if mut_type == 0 or length < 3:
+    sample_size = len(sample)
+    if mut_type == 0 or sample_size < 3:
         return sample
 
     if mut_type == 1:
         is_add = np.random.rand()
-        if is_add < 0.5 and length < k:
-            val = np.random.randint(n)
+        if is_add < 0.5 and sample_size < args.budget:
+            val = np.random.randint(S)
             sample.append(val)
         elif is_add >= 0.5:
-            sample.pop(np.random.randint(length))
+            sample.pop(np.random.randint(sample_size))
     elif mut_type == 2:
-        sample.pop(np.random.randint(length))
-        val = np.random.randint(n)
+        sample.pop(np.random.randint(sample_size))
+        val = np.random.randint(S)
         sample.append(val)
     return sample
 
@@ -142,21 +132,26 @@ def mutation(sample):
 def new_population(p):
     for i, gen in enumerate(p):
         if gen[0] == -0.1:
-            p[i] = fitness_calc(gen[1])
+            p[i] = fitness(gen[1])
     sorted_list = sorted(p, key=lambda x: x[0], reverse=True)
     return sorted_list[:N]
 
 
 def new_son(fa):
     draw = np.random.choice(Ns, size=2, p=prob, replace=False)
-    son = cross_over(fa[draw[0] - 1][1], fa[draw[1] - 1][1])
-    son1 = mutation(son[0])
-    son2 = mutation(son[1])
+    child1, child2 = [], []
+    c_point = np.random.randint(nodes * 2)
+    for i in fa[draw[0] - 1][1]:
+        (child1 if i < c_point else child2).append(i)
+    for i in fa[draw[1] - 1][1]:
+        (child2 if i < c_point else child1).append(i)
+    son1 = mutation(sorted(child1))
+    son2 = mutation(sorted(child2))
     return (-0.1, son1), (-0.1, son2)
 
 
-def gen_prob(num):
-    pr = [1 / (i + 1) for i in range(num)]
+def generate_probability(nums):
+    pr = [1 / (i + 1) for i in range(nums)]
     pr = [p / sum(pr) for p in pr]
     return pr
 
@@ -166,16 +161,16 @@ if __name__ == "__main__":
     graph1, graph2, neighbor, i1, i2 = read_dataset(args.network, args.initial_seed)
     bln1, bln2 = simulate(graph1, graph2, neighbor, 3)
 
-    k = args.budget
     nodes = len(neighbor.keys())
     Ns = list(range(1, N + 1))
+    sl1, sl2 = len(bln1), len(bln2)
+    S = sl1 + sl2
+    prob, probw = generate_probability(N), generate_probability(S)
+
     res1, res2 = set(), set()
     res1 = reduce(lambda acc, i: acc | bln1[i], i1, res1)
     res2 = reduce(lambda acc, i: acc | bln2[i], i2, res2)
-    sl1, sl2 = len(bln1), len(bln2)
-    n = sl1 + sl2
-    prob, probw = gen_prob(N), gen_prob(n)
-    dicnum = list(range(1, n + 1))
+    dicnum = list(range(1, S + 1))
     s_bln1 = list(dict(sorted(bln1.items(), key=lambda x: len(x[1]), reverse=True)).keys())
     s_bln2 = list(dict(sorted(bln2.items(), key=lambda x: len(x[1]), reverse=True)).keys())
 
