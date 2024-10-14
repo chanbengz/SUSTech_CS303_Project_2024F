@@ -58,7 +58,7 @@ def simulate(graph1, graph2, neighbor, simtimes):
                             new.add(nodei)
                 activated.update(new)
                 active = new
-            blncd1[j] = i == 0 and current or blncd1[j] & current
+            blncd1[j] = i == 0 and current or (blncd1[j] & current)
 
         for j in graph2.keys():
             current = set()
@@ -76,7 +76,7 @@ def simulate(graph1, graph2, neighbor, simtimes):
                             new.add(nodei)
                 activated.update(new)
                 active = new
-            blncd2[j] = i == 0 and current or blncd2[j] & current
+            blncd2[j] = i == 0 and current or (blncd2[j] & current)
     return blncd1, blncd2
 
 

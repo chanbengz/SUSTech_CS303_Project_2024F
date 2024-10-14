@@ -65,14 +65,12 @@ def heur_search(graph1, graph2, neighbor, i1, i2, n, k, simtimes) -> (set, set):
         for i in [_ for _ in graph1.keys() if _ not in u1]:
             res = n - len((r1 | blncd1[i]) ^ r2)
             if res > max1:
-                max1 = res
-                id1 = i
+                max1, id1 = res, i
 
         for i in [_ for _ in graph2.keys() if _ not in u2]:
             res = n - len(r1 ^ (r2 | blncd2[i]))
             if res > max2:
-                max2 = res
-                id2 = i
+                max2, id2 = res, i
 
         if id1 == -1 and id2 == -1:
             break

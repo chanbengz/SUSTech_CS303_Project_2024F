@@ -6,7 +6,7 @@
 \usepackage[hidelinks]{hyperref}
 
 \title{\textbf{CS303 Artifitial Intelligence 2024F Project1 Report}}
-\author{Ben CHEN \\ \texttt{chenb2022@mail.sustech.edu.cn}}
+\author{Ben Chen \\ \texttt{chenb2022@mail.sustech.edu.cn}}
 
 \begin{document}
 \maketitle
@@ -43,15 +43,12 @@ According to the problem description, we define the following terminologies:
 \paragraph{Influence Result} A subset of nodes $r(U) \subseteq V$ representing the nodes influenced by the seed set $U \subseteq V$. However, we need to find the mathematical expectation rather than the size of nodes.
 
 \subsection{Diffusion Model}
-We apply the Independent Cascade Model to simulate the information propagation in the social network. The model is defined as follows:
+We apply the Independent Cascade Model to simulate the information propagation in the social network. The model is defined as follows. Each nodes $v \in V$ has a state \textit{active} or \textit{inactive} representing whether the node has received the information.
+\paragraph{Active} Nodes receive information from their neighbors with and can activate their neighbors. Active nodes won't be changed to inactive.
+\paragraph{Inactive} Nodes have been attempted to be activated by their neighbors but failed. We don't consider the nodes that never be attempted to be reached, i.e., the nodes that have no active neighbors.
+\paragraph{Result} The active and inactive nodes are finally determined if both remains unchanged in a round, and finally decide the $r(U)$ in the equation below.
 
-\begin{itemize}
-    \item Each nodes $v \in V$ has a state \textit{active} or \textit{inactive} representing whether the node has received the information.
-    \item \textbf{Active} nodes receive information from their neighbors with and can activate their neighbors. Active nodes won't be changed to inactive.
-    \item \textbf{Inactive} nodes have been attempted to be activated by their neighbors but failed. We don't consider the nodes that never be attempted to be reached, i.e., the nodes that have no active neighbors.
-\end{itemize}
-
-$r(U)$ is the set contains active and inactive nodes mentioned above.
+\paragraph{} The major difference between active and inactive nodes is whether they will help spread the opinion to their neighbors. It's apparent that the model mimics the real-world information since the problem cares only about whether a person is reached.
 
 \subsection{Result}
 
@@ -68,20 +65,138 @@ The expectation is calculated by the sum of probabilities times size of nodes ca
 \section{Methodology}
 
 \subsection{Evaluation Algorithm}
-Since computing the balanced information exposure for a given solution is NP-hard, we cannot directly iterate all the possible nodes to caculate the expected number of nodes. Instead, we use a Monte Carlo simulation to estimate the expected number of nodes. The algorithm is described as follows:
+Since computing the balanced information exposure for a given solution is NP-hard, we cannot directly iterate all the possible nodes to caculate the expected number of nodes. Instead, we use a Monte Carlo simulation as in \href{alg:monte-carlo}{Algorithm 1} to estimate the expected number of nodes. The key idea is to randomly emulate the information propagation to obtain samples, i.e., get a random value and test if it outweighs the edge's probability since higher probability will more likely to be activated. Idealy, when the sample size is large enough, the accumalted results divided by sample size, i.e. the average result will approach the expectation, since
+
+\[
+    \widehat{\Phi} \left( S_1, S_2 \right) = \frac{\sum_{i=1}^{N} \Phi_{g_i}\left(S_1, S_2\right)}{N}
+\]
+
+\begin{algorithm}
+\caption{Monte-Carlo Evaluation}\label{alg:monte-carlo}
+\KwData{Social network $G = (V, E)$, initial seed sets $I_1, I_2$, balanced seed sets $S_1, S_2$, simulation times $N$}
+\KwResult{Expected number of nodes that either receives from both campaigns or remains oblivious $\Phi \mathbb{E} \left[ |V \backslash (r_1(I_1\cup S_1) \Delta r_2(I_2\cup S_2))| \right]$}
+$E\leftarrow 0$\;
+\For{$i\leftarrow 0$ \KwTo $N$}{
+    $\text{Infected}, \text{Active}, \text{Activated} \leftarrow I_1 \cup S_1$\;
+    \While{there are active nodes}{
+        \For{$v \in \text{Active}$}{
+            \For{edge $(v, u) \in E$}{
+                $\text{Infected} \leftarrow \text{Infected} \cup \{v\}$\;
+                \If{$u \notin \text{Infected}$ and $p_1(v, u) > \text{rand()}$}{
+                    $\text{Activated} \leftarrow \text{Activated} \cup \{u\}$\;
+                }
+            }
+        }
+        update Active nodes with nodes been added to Activated in this iteration\;
+    }
+    Do the same for $I_2 \cup S_2$\;
+    $E \leftarrow E + |V \backslash (r_1(I_1\cup S_1) \Delta r_2(I_2\cup S_2))|$\;
+}
+\Return $E/N$\;
+\end{algorithm}
 
 \subsection{Heuristic Algorithm}
+As taught in lecture and lab sessions, we can use a greedy best-first search algorithm. The main idea is to select the nodes that can maximize the increment of the balanced information exposure, i.e., $h(v)$. After we pick some candidate nodes, we can use greedy search to determine effective nodes to add.
+Before performing search, we need to apply a Monte Carlo simulation to get the candidate node sets $r_1(\{v_i\})$ and $r_2(\{v_i\})$ to reduce the search space and with some pruning. We do the following steps:
+
+\begin{enumerate}
+    \item On input social networks $G = (V, E)$, for each campaign $C_i\ (i = 1, 2)$, we delete all edges with $p_i(u, v) \le t$ for some threshold $t$ to get subgraph $G_i$. We estimate the threshold to about $10^{-7}$ since it's much unlikely to be activated at this probability.
+    \item In the subgraph $G_i$, we perform a similar Monte Carlo simulation as in \hyperlink{alg:monte-carlo}{Algorithm 1} to get the candidate nodes $r_i(\{v_i\})$. But this time, we only need to simulate for a much smaller amount. Take their intersection to get the candidate nodes.
+    \item We then run the heuristic search algorithm as in \hyperlink{alg:heuristic}{Algorithm 2} to get the balanced seed sets, this works since we have the estimation: \[ r_1(\widehat{S_1\cup \{v_i\}}) = r_1(S_1) \cup r_i(\{v_i\}) \] by which we can evaluate the heuristic search. Same for $r_2$.
+\end{enumerate}
+
+For the first and second steps, the time complexity is $O(|V| + |E|)$, since we just need to widely visit the nodes and edges. The third step is $O(k|V|)$, since we need to iterate $k$ times to get the balanced seed sets. The overall time complexity is $O(k|V|)$ which is feasible theoretically.
+
+\begin{algorithm}
+\caption{Heuristic Search of IEM}\label{alg:heuristic}
+\KwData{Social network $G = (V, E)$, initial seed sets $I_1, I_2$, budget $k$, candidate nodes $r_1(\{v_i\})$ and $r_2(\{v_i\})$}
+\KwResult{Balanced seed sets $S_1, S_2$}
+$S_1, S_2 \leftarrow \emptyset$\;
+$\Phi_{max} \leftarrow \Phi \left( S_1, S_2 \right)$\;
+\While{$|S_1| + |S_2| < k$}{
+    $v_1^* \leftarrow \arg \max_{v} \left( \Phi(S_1\cup \{v\}, S_2) - \Phi(S_1, S_2) \right)$\;
+    $v_2^* \leftarrow \arg \max_{v} \left( \Phi(S_1, S_2\cup \{v\}) - \Phi(S_1, S_2) \right)$\;
+    \If{$\Phi(S_1\cup \{v_1^*\}, S_2) = \Phi(S_1, S_2\cup \{v_2^*\}) = \Phi(S_1, S_2)$}{
+        break\;
+    }
+    \ElseIf{$\Phi(S_1\cup \{v_1^*\}, S_2) > \Phi(S_1, S_2\cup \{v_2^*\})$}{
+        $S_1 \leftarrow S_1 \cup \{v_1^*\}$\;
+    }
+    \Else{
+        $S_2 \leftarrow S_2 \cup \{v_2^*\}$\;
+    }
+}
+\Return $S_1, S_2$\;
+\end{algorithm}
 
 \subsection{Evolutionary Algorithm}
 
+\begin{algorithm}
+\caption{Evolutionary Algorithm of IEM}\label{alg:evolutionary}
+\end{algorithm}
+
 \section{Experiments}
-
 \subsection{Setup}
+In this section, we adapt a compound testing methods to evaluate the effectiveness of the algorithms, which is to test the same code locally and remotely on Online Judge, and compare the results. For local testing, we use the following environment:
+\begin{table}[!htbp]
+    \begin{center}
+    \begin{tabular}[c]{cc}
+        \textbf{Model} & MacBook Air M3 13' \\
+        \textbf{CPU} & Apple M3 4E + 4P 2.4GHz-3.7GHz \\
+        \textbf{Memory} & LPDDR5-6400 8GB Unified Memory
+    \end{tabular}
+    \end{center}
+\end{table}
 
-\subsection{Results}
+And for remote testing, we use the following environment:
 
-\section{Analysis}
+\begin{table}[!htbp]
+    \begin{center}
+    \begin{tabular}[c]{cc}
+        \textbf{Model} & Online Judge \\
+        \textbf{CPU} & Intel Xeon E5-2680 2.2GHz * 1 \\
+        \textbf{Memory} & UNKNOWN
+    \end{tabular}
+    \end{center}
+\end{table}
+
+For the accuracy of evaluation, we MUST use the dataset provided by the Online Judge to test the algorithm and OJ also provides the reference result of first three datasets. Hopefully, the dataset provided contains different sizes of graphs with a clear gradient. After finishing the evaluator, for heuristic and evolutionary algorithms, we can apply to test the balanced information exposure from the balanced seed sets generated by the algorithms to evaluate the effectiveness of it.
+
+\subsection{Evaluator Results}
+
+
+\subsection{Heuristic Results}
+
+
+\subsection{Evolutionary Results}
+
 
 \section{Conclusion}
+
+\subsection{Algorithm Evaluation}
+
+
+\subsubsection{Monte-Carlo Evaluation}
+
+
+\subsubsection{Heuristic Algorithm}
+
+
+\subsubsection{Evolutionary Algorithm}
+
+
+\subsection{Improvement}
+
+\subsubsection{Monte-Carlo Evaluation}
+
+
+\subsubsection{Heuristic Algorithm}
+
+
+\subsubsection{Evolutionary Algorithm}
+
+
+\subsection{Lessons Learned}
+
 
 \end{document}

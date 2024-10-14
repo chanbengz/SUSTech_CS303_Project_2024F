@@ -47,7 +47,7 @@ def evaluate(graph, set1, set2, simtimes) -> float:
         while active:
             new = set()
             for node in active:
-                for v, n, p in edges[node]:
+                for _, n, p in edges[node]:
                     if n not in activated:
                         infected1.add(n)
                         if np.random.rand() < p['p1']:
@@ -62,7 +62,7 @@ def evaluate(graph, set1, set2, simtimes) -> float:
         while active:
             new = set()
             for node in active:
-                for v, n, p in edges[node]:
+                for _, n, p in edges[node]:
                     if n not in activated:
                         infected2.add(n)
                         if np.random.rand() < p['p2']:
