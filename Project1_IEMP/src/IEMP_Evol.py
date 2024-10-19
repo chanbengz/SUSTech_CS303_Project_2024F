@@ -15,7 +15,7 @@ args = parser.parse_args()
 
 S = 0
 N = 100
-global bln1, bln2, res1, res2, nodes, sl1, sl2, s_bln1, s_bln2, Ns, prob, dicnum, probw
+global bln1, bln2, res1, res2, nodes, sl1, sl2, s_bln1, s_bln2, Ns, probN, dicnum, probS
 
 
 def read_dataset(network_path, initial_seed_path):
@@ -82,10 +82,11 @@ def simulate(graph1, graph2, neighbor, simtimes):
 
 def generate_structure(nums):
     pop = []
+
     for _ in range(nums):
         tmp = []
         k_num = np.random.randint(args.budget - 3, args.budget + 1)
-        indices = np.random.choice(dicnum, size=k_num, p=probw, replace=False).tolist()
+        indices = np.random.choice(dicnum, size=k_num, p=probS, replace=False).tolist()
         for index in indices:
             i = index // 2
             if index & 1 == 0 and i < len(s_bln1):
@@ -93,6 +94,7 @@ def generate_structure(nums):
             elif i < len(s_bln2):
                 tmp.append(s_bln1[i] if i > sl2 else s_bln2[i] + nodes)
         pop.append((-0.1, tmp))
+
     return pop
 
 
@@ -106,26 +108,29 @@ def fitness(sample):
     blnmax = nodes - len(r1 ^ r2)
     if len(sample) > args.budget:
         return -blnmax, sample
+
     return blnmax, sample
 
 
 def mutation(sample):
     mut_type = np.random.randint(2)
     sample_size = len(sample)
+
+    # Don't Mutation
     if mut_type == 0 or sample_size < 3:
         return sample
-
+    # Flip Mutation
     if mut_type == 1:
-        is_add = np.random.rand()
-        if is_add < 0.5 and sample_size < args.budget:
-            val = np.random.randint(S)
-            sample.append(val)
-        elif is_add >= 0.5:
+        p = np.random.rand()
+        if p < 0.5 and sample_size < args.budget:
+            sample.append(np.random.randint(S))
+        elif p >= 0.5:
             sample.pop(np.random.randint(sample_size))
+    # Swap Mutation
     elif mut_type == 2:
         sample.pop(np.random.randint(sample_size))
-        val = np.random.randint(S)
-        sample.append(val)
+        sample.append(np.random.randint(S))
+
     return sample
 
 
@@ -138,13 +143,15 @@ def new_population(p):
 
 
 def new_son(fa):
-    draw = np.random.choice(Ns, size=2, p=prob, replace=False)
+    draw = np.random.choice(Ns, size=2, p=probN, replace=False)
     child1, child2 = [], []
     c_point = np.random.randint(nodes * 2)
+    # cross over
     for i in fa[draw[0] - 1][1]:
         (child1 if i < c_point else child2).append(i)
     for i in fa[draw[1] - 1][1]:
         (child2 if i < c_point else child1).append(i)
+    # mutation
     son1 = mutation(sorted(child1))
     son2 = mutation(sorted(child2))
     return (-0.1, son1), (-0.1, son2)
@@ -165,7 +172,7 @@ if __name__ == "__main__":
     Ns = list(range(1, N + 1))
     sl1, sl2 = len(bln1), len(bln2)
     S = sl1 + sl2
-    prob, probw = generate_probability(N), generate_probability(S)
+    probN, probS = generate_probability(N), generate_probability(S)
 
     res1, res2 = set(), set()
     res1 = reduce(lambda acc, i: acc | bln1[i], i1, res1)

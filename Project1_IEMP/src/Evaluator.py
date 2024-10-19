@@ -84,5 +84,4 @@ if __name__ == "__main__":
     with open(args.output, "w") as f:
         f.write(str(ans))
 
-    # print(f"Execution time: {time.time() - start:.2f}s")
-    # print(ans)
+    print(f"Execution time: {time.time() - start:.2f}s")
