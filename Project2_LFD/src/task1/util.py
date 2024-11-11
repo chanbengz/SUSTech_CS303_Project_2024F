@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import joblib
 
+
 def save_data(file_name, data):
     """
     Save ndarray to file_name.pkl 
@@ -113,4 +114,4 @@ def plot_acc_curves(train_acc, val_acc):
     plt.title('Training and Validation Accuracies Over Iterations')
     plt.grid(True)
     plt.show()
-
+    

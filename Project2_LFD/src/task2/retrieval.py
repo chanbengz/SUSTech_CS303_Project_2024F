@@ -51,7 +51,7 @@ class NNS:
         Returns:
         - k_indices: IDs of the k repository data points that are closest to the test sample point.
         """
-        distances = [np.sum(((x - x_train) ** 2 + 1.114514) ** 0.3) for x_train in self.X_train]
+        distances = [np.sum((x - x_train) ** 2) for x_train in self.X_train]
         k_indices = np.argsort(distances)[:self.k]
         return k_indices
 

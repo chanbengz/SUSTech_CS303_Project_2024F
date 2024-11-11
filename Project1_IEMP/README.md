@@ -6,6 +6,11 @@
 
 ## Description
 
+This project is to solve the Information Exposure Maximization Problem (IEMP) with Evolutionary Algorithm and Heuristic Algorithm. The IEMP is a NP problem to find a set of balanced seeds in a social network to maximize the information exposure. We have three stages in this project:
+
+- [Evaluator](./src/Evaluator.py): to evaluate the result of given dataset including initial and balanced seeds and networks
+- [IEMP_Heur](./src/IEMP_Heur.py): to solve this NP problem with Heuristic Algorithm
+- [IEMP_Evol](./src/IEMP_Evol.py): to solve this NP problem with Evolutionary Algorithm
 
 ## Usage
 
