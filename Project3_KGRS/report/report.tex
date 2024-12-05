@@ -14,7 +14,17 @@
 
 \section{Introduction}
 
+\subsection{Problem Description}
+
+A recommendation system infers the preference of a user based on the historical data and relevant information of the user. More specifically, recommendation systems are score functions that calculate the probability of a user liking an item, according to the user's historical interaction data and the item's information. In this project, we will put more attention on the knowledge graph, i.e., the hybrid of user-item interaction history and item features, to achieve better recommendation performance.
+
+\subsection{Purpose}
+
+The purpose of this project is to implement a recommendation system based on the knowledge graph. We will use the user-item interaction history and item features to predict the probability of a user liking an item. We will use the knowledge graph to model the user-item interaction history, along with additional information and train a neural network to learn the representation of the user and item. We will use the learned representation to predict the probability of a user being interested in some item and the top-k items that the user may like.
+
 \section{Preliminary}
+
+Knowledge Graph is a triple relation $(h, r, t)$, where $h$ is the head entity, $r$ is the relation and $t$ is the tail entity. The knowledge graph can be represented as a graph $G = (V, E)$, where $V$ is the set of entities and $E$ is the set of relations. 
 
 \section{Methodology}
 
