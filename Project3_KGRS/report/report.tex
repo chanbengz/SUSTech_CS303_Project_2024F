@@ -20,22 +20,284 @@ A recommendation system infers the preference of a user based on the historical 
 
 \subsection{Purpose}
 
-The purpose of this project is to implement a recommendation system based on the knowledge graph. We will use the user-item interaction history and item features to predict the probability of a user liking an item. We will use the knowledge graph to model the user-item interaction history, along with additional information and train a neural network to learn the representation of the user and item. We will use the learned representation to predict the probability of a user being interested in some item and the top-k items that the user may like.
+The purpose of this project is to implement a recommendation system based on the knowledge graph. We will use the user-item interaction history and item features to predict the probability of a user liking an item. We will use the interaction record to model the user-item interaction history, along with additional knowledge graph and train a neural network to learn the representation of the user and item. We will use the learned representation to predict the probability of a user being interested in some item and the top-k items that the user may like.
 
 \section{Preliminary}
 
-Knowledge Graph is a triple relation $(h, r, t)$, where $h$ is the head entity, $r$ is the relation and $t$ is the tail entity. The knowledge graph can be represented as a graph $G = (V, E)$, where $V$ is the set of entities and $E$ is the set of relations. 
+Given a interaction record $Y_{\text{train}}$ with postive and negative samples, and a knowledge graph $G = (V, E)$, we need to train on interaction record and optimize the accuracy with additional information provided by the knowledge graph. For each record in $Y_{\text{train}}$, we have 
+\[
+    y_{uw} \in \left\{ 0, 1 \right\}, \quad u \in U, w \in W
+\]
+where $U$ is the set of users and $W$ is the set of items, to indicates whether user $u$ likes item $w$. 
+
+The knowledge graph $G$ contains the information of the items, which can be represented as a set of triples $(u, r, w)$, where $u$ is the user, $r$ is the relation, and $w$ is the item. The relation $r$ can be encoded as a weight value to indicate the importance of the relation.
+
+In the first situation, we need to predict the click-through rate, which ideally the interest of the user to the item. It will be evaluates using the AUC metric. The AUC, Area Under Curve metric is defined as follows. Given a test sets with postive sample $S$ and negative sample $S^{\prime}$, 
+\[
+    \text{AUC} = \frac{\sum_{s \in S, s^{\prime}\in S^{\prime}} I(s, s^{\prime})}{|S|\times|S^{\prime}|}
+\]
+where function $I$ is defined as
+
+\[
+    I(s, s^{\prime}) = \left\{
+        \begin{aligned}
+            0, & \quad f(s) < f(s^{\prime}) \\
+            0.5, & \quad f(s) = f(s^{\prime}) \\
+            1, & \quad f(s) > f(s^{\prime})
+        \end{aligned}
+    \right.
+\]
+
+And in the second situation, we need to predict the top-k items that the user may like, which is instead of given a scalar between 0 and 1, to emit a vector to indicate the top k items the user might be interested in, which will be evaluated using the nDCG@k metric. The nDCG@k, normalized Discounted Cumulative Gain metric is defined as follows. Given a test sets with a list of users with $|U| = l$ and a postive item set $S$, and the score function returns $M = \mathbb{R}^{l\times k}$
+\[
+    \text{nDCG@k} = \frac{1}{l} \sum_{i = 1}^{l} \frac{\text{DCG}_i\text{@k}(S_i, M_i)}{\text{iDCG}_i\text{@k}(S_i)}
+\]
+where $\text{iDCG}_i\text{@k}(S_i)$ is the ideal DCG@k of the $i$-th user, and $\text{DCG}_i\text{@k}(M_i, S_i)$ is the DCG@k of the $i$-th user. The DCG@k is defined as
+\[
+    \text{DCG}_i\text{@k}(S_i, M_i) = \sum_{j = 1}^{k} \frac{I(S_i, M_{ij})}{\log_2(j+1)}
+\]
+\[
+    \text{iDCG}_i\text{@k}(S_i) = \sum_{j = 1}^{\min(k, |S_i|)} \frac{1}{\log_2(j+1)}
+\]
+and the function $I$ is defined as
+\[
+    I(S_i, M_{ij}) = \left\{
+        \begin{aligned}
+            1, & \quad M_{ij} \in S_i \\
+            0, & \quad \text{otherwise}
+        \end{aligned}
+    \right.
+\]
+
+Our job, generally speaking, is to design a score function $f(u, w)$ on the input $u$ as user and $w$ as item, to predict the interest level $y_{\text{test}} \in \left[0,1\right]$ to maximize two metrics in two real-world situation.
+
+\begin{enumerate}
+    \item Maximize the AUC metric on score function $f$ \[\max_{f} \text{AUC}(f, Y_{\text{test}}) \]
+    \item Maximize the nDCG@k metric on score function $f$ with $k = 5$ \[\max_{f} \text{nDCG@5}(f, Y_{\text{test}}) \]
+\end{enumerate}
 
 \section{Methodology}
 
+To achieve the goal, we generally will follow the following steps
+
+\begin{algorithm}[!ht]
+\caption{Training}
+\KwIn{$\text{epoch\_num}$: Number of epochs, $\text{output\_log}$: Boolean for logging progress (default False)}
+\KwOut{Model}
+\SetKwFunction{FMain}{Train}
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FMain{epoch\_num, output\_log}}{
+    Initialize Adam optimizer with learning rate $\text{learning\_rate}$ and weight decay $\text{weight\_decay}$\;
+    \For{$\text{epoch} = 1$ to $\text{epoch\_num}$}{
+        $\text{train\_batches} \gets$ Get training batches from dataloader\;
+        Initialize an empty list $\text{losses}$\;
+        \ForEach{$\text{batch}$ in $\text{train\_batches}$}{
+            $\text{loss} \gets$ Optimize with current batch\;
+            Update model parameters by performing backpropagation and optimizer step\;
+            Append $\text{loss}$ to $\text{losses}$\;
+        }
+        \If{$\text{output\_log}$}{
+            Print average loss for this epoch\;
+        }
+    }
+}
+\end{algorithm}
+
+\begin{enumerate}
+    \item Preprocess the data. We will encode the data to our representation in code, i.e., construct the knowledge graph.
+    \item Train the model. We will train the model on the training data, and calculate the loss function to optimize the model.
+    \item Evaluate the model. We will evaluate the model on the test data, and calculate the AUC and nDCG@5 metric.
+    \item Tune the hyperparameters. We will tune the hyperparameters to achieve better performance, i.e., epoch, learning rate, batch size, etc.
+    \item Submit the result. We will submit the result to the OJ server to evaluate the performance.
+\end{enumerate}
+
+Firstly, encoding the knowledge graph is a trivial process as it can easily be done by (1) mapping the relation to weights and (2) constructing the graph. The next step is to randomly split the datasets into batches and train the model. The training algorithm is shown in the above algorithms. Here, we adapt a nerual network with forward pass and Adam optimizer to optimize the model. 
+
+\begin{algorithm}[!h]
+\caption{Optimization}
+\KwIn{$\text{pos}$: Positive samples, $\text{neg}$: Negative samples}
+\KwOut{$\text{loss}$: Calculated loss}
+\SetKwFunction{FMain}{Optimize}
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FMain{pos, neg}}{
+    $\text{pos\_score} \gets$ Forward pass for $\text{pos}$\;
+    $\text{neg\_score} \gets$ Forward pass for $\text{neg}$\;
+    $\text{pos\_matrix} \gets$ Multiply $\text{pos\_score}$ by transpose of ones matrix with same size as $\text{neg\_score}$\;
+    $\text{neg\_matrix} \gets$ Multiply $\text{neg\_score}$ by transpose of ones matrix with same size as $\text{pos\_score}$\;
+    $\text{loss} \gets \text{Mean of} \left( \max \left( \text{neg\_matrix} - \text{pos\_matrix} + \text{margin}, 0 \right) \right)$\;
+    \Return{$\text{loss}$}
+}
+\end{algorithm}
+
+The details of Adam optimizer is ignored here since it's not much relevant to the project. The subprocesses are shown below.
+
+\begin{algorithm}
+\caption{Forward Pass}
+\KwIn{$\text{head}$: List of head entities, $\text{rel}$: List of relations, $\text{tail}$: List of tail entities}
+\KwOut{$\text{score}$: Similarity score of the input triple}
+\SetKwFunction{FMain}{ForwardPass}
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FMain{head, rel, tail}}{
+    $\text{head\_emb} \gets$ Embedding of $\text{head}$\;
+    $\text{tail\_emb} \gets$ Embedding of $\text{tail}$\;
+    $\text{rel\_emb} \gets$ Embedding of $\text{rel}$\;
+    \If{$\text{l1}$}{
+        $\text{score} \gets \sum \left| (\text{head\_emb} + \text{rel\_emb}) - \text{tail\_emb} \right|$\;
+    }
+    \Else{
+        $\text{score} \gets \sum \left( (\text{head\_emb} + \text{rel\_emb}) - \text{tail\_emb} \right)^2$\;
+    }
+    \Return{$-\text{score}$}
+}
+\end{algorithm}
+
 \section{Experiments}
+
+In experiments, we adapt a compound testing methods to evaluate the effectiveness of the algorithms, which is to train the model locally and test remotely. For local testing, we use the following environment:
+\begin{table}[!htbp]
+    \begin{center}
+    \begin{tabular}[c]{cc}
+        \textbf{Model} & MacBook Air M3 13' \\
+        \textbf{CPU} & Apple M3 4E + 4P 2.4GHz-3.7GHz \\
+        \textbf{Memory} & LPDDR5-6400 8GB Unified Memory
+    \end{tabular}
+    \end{center}
+\end{table}
+
+And for remote testing, we use the following environment:
+
+\begin{table}[!htbp]
+    \begin{center}
+    \begin{tabular}[c]{cc}
+        \textbf{Model} & Online Judge \\
+        \textbf{CPU} & Intel Xeon E5-2680 2.2GHz * 2 \\
+        \textbf{Memory} & 8GB DDR4 2666MHz
+    \end{tabular}
+    \end{center}
+\end{table}
+
+Because the test data is currently unavailable, we will be using the parts of training data as test data to evaluate the performance of the model. The hyperparameters will be tuned locally and the result will be submitted to the OJ server to evaluate the performance. In the training dataset, there are
+26,638 positive samples and 24,037 negative samples, and 6729 nodes and 20195 relations in the knowledge graph.
+
+\begin{algorithm}[!ht]
+\caption{Predict CTR}
+\KwIn{$\text{eval\_batches}$: List of evaluation batches}
+\KwOut{$\text{scores}$: Array of evaluation scores}
+\SetKwFunction{FMain}{CTR\_Eval}
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FMain{eval\_batches}}{
+    \ForEach{$\text{batch}$ in $\text{eval\_batches}$}{
+        $\text{batch} \gets \text{transpose of batch}$\;
+    }
+    Initialize empty list $\text{scores}$\;
+    \ForEach{$\text{batch}$ in $\text{eval\_batches}$}{
+        Initialize $\text{rel}$ as list of 'feedback\_recsys' relations for each element in the batch\;
+        $\text{score} \gets$ Forward pass using batch[0] + number of entities, $\text{rel}$, and batch[1]\;
+        Append $\text{score}$ to $\text{scores}$\;
+    }
+    $\text{scores} \gets$ Concatenate all scores in $\text{scores}$ along axis 0\;
+    \Return{$\text{scores}$}
+}
+\end{algorithm}
 
 \subsection{Task 1}
 
+The evaluation metric of AUC is described previously. The l1 norm is enabled to prevent overfitting. The batch size and other three hyperparameters remains the same is it doesn't show much difference in accuracy locally.
+
+\begin{table}[!htbp]
+\setlength{\abovecaptionskip}{+0.2cm}
+\setlength{\belowcaptionskip}{+0.2cm}
+\centering
+\caption{Identical hyperparameters in model}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Batch Size} & \textbf{Evaluation Batch Size} & \textbf{Negative Rate} & \textbf{Dimension of Embedding}\\
+\midrule
+256 & 1024 & 1 & 128 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results shown below are the result of the model with various hyperparameters. 
+\begin{table}[!htbp]
+\setlength{\abovecaptionskip}{+0.2cm}
+\setlength{\belowcaptionskip}{+0.2cm}
+\centering
+\caption{Result with hyperparameters in AUC}
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Learning Rate} & \textbf{Weight Decay} & \textbf{Epoch Number} & \textbf{Margin} & \textbf{Time Cost} & \textbf{AUC Score} \\ 
+\midrule
+2e-3 & 1e-4 & 25 & 70 & 80.68s & 0.688 \\
+2e-3 & 1e-4 & 30 & 70 & 86.70s & 0.686 \\
+1e-3 & 5e-3 & 30 & 70 & 88.23s & 0.704 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+It clear that number of epoch does not significantly affects the
+performance of the model and over-trained model may even lead to worse accuracy.
+Based on our observation of the training data, our intuitive gives that the model is likely to have been over-trained. So to boost accuracy, the model together with less learning rate and more weight decay will probably lead to better performance, which is proven in the result.
+
 \subsection{Task 2}
 
-\subsection{Result}
+The metric is also defined in the previous section and the hyperparameters are the same as in Task 1. The The result is shown below, from which
+we can see that similar to the result in Task 1, the model with less learning rate and more weight decay will lead to better performance.
+
+\begin{table}[!htbp]
+\setlength{\abovecaptionskip}{+0.2cm}
+\setlength{\belowcaptionskip}{+0.2cm}
+\centering
+\caption{Result with hyperparameters in nDCG@5}
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Learning Rate} & \textbf{Weight Decay} & \textbf{Epoch Number} & \textbf{Margin} & \textbf{Cost} & \textbf{nDCG@5 Score} \\ 
+\midrule
+2e-3 & 1e-4 & 25 & 70 & 80.68s & 0.181 \\
+2e-3 & 1e-4 & 30 & 70 & 86.70s & 0.178 \\
+1e-3 & 5e-3 & 30 & 70 & 88.23s & 0.182 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Conclusion}
+
+In overall sense, the knowledge graph-based recommendation system has the significant advantages:
+
+\paragraph{Rich information source} The knowledge graph provides a comprehensive perspective of the user-item interaction history and item features, which is better and highly explainable.
+
+\begin{algorithm}[!ht]
+\caption{Predict Top-k}
+\KwIn{$\text{users}$: List of users, $k$: Number of top items to return (default 5)}
+\KwOut{$\text{sorted\_list}$: List of top-k items for each user}
+\SetKwFunction{FMain}{TopK\_Eval}
+\SetKwProg{Fn}{Function}{:}{}
+\Fn{\FMain{users, k}}{
+    $\text{item\_list}, \text{train\_user\_pos\_item} \gets$ Get positive item list from dataloader\;
+    Initialize empty list $\text{sorted\_list}$\;
+    \ForEach{$\text{user}$ in $\text{users}$}{
+        Initialize $\text{head}$ as the user ID + number of entities for each item in the item list\;
+        Initialize $\text{rel}$ as list of 'feedback\_recsys' relations for each item in the item list\;
+        $\text{tail} \gets \text{item\_list}$\;
+        $\text{scores} \gets$ Forward pass using $\text{head}$, $\text{rel}$, and $\text{tail}$\;
+        $\text{score\_ast} \gets$ Sort $\text{scores}$ in descending order\;
+        Initialize empty list $\text{sorted\_items}$\;
+        \ForEach{$\text{index}$ in $\text{score\_ast}$}{
+            \If{length of $\text{sorted\_items}$ $\geq k$}{
+                \textbf{break}\;
+            }
+            \If{user is not in $\text{train\_user\_pos\_item}$ or item at $\text{item\_list[index]}$ is not in $\text{train\_user\_pos\_item[user]}$}{
+                Append $\text{item\_list[index]}$ to $\text{sorted\_items}$\;
+            }
+        }
+        Append $\text{sorted\_items}$ to $\text{sorted\_list}$\;
+    }
+    \Return{$\text{sorted\_list}$}
+}
+\end{algorithm}
+
+\paragraph{Serendipitous recommendation} The KG-based RS possesses the relation graph with long-tail information, which enables the discovery of new item for users, while the plain RS may only recommend popular items.
+
+Through this project, I acquired the knowledge of recommendation system and the benefits of knowledge graph in recommendation system and ways to embed the optimization with it. By mapping the user-item relation, we may achieve a better recommendation in small-scale dataset. In the future, we may explore the real-world knowledge graph-based recommendation system and its application in large-scale dataset.
 
 \end{document}
