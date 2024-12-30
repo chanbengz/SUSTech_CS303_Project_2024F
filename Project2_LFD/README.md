@@ -1,8 +1,5 @@
-<div align='center'>
-
 # Project2 Learning From Data
 
-</div>
 
 ## Description
 

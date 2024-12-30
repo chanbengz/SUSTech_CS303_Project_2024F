@@ -1,8 +1,4 @@
-<div align='center'>
-
 # Project3 Knowledge Graph-based Recommendation System
-
-</div>
 
 ## Description
 
